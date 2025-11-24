@@ -12,7 +12,8 @@ env:
 
 jobs:
   build-and-release:
-  name: Run on LAPTOP-17
+    name: Run on LAPTOP-17
+    runs-on: self-hosted
 
     steps:
       # 1️⃣ Checkout repo
