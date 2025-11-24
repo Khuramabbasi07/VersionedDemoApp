@@ -1,44 +1,57 @@
 # .github/workflows/ci-cd.yml
-name: Run on LAPTOP-17
+name: Versioned Build & Deploy
 
 on:
   push:
     branches:
-      - main   
+      - main   # ya QA/UAT branch
 
 env:
-  PROJECT_NAME: "Simple-CI-CD-Demo"
+  PROJECT_NAME: "VersionedDemoApp"
   DEPLOY_DIR: "./deploy"
 
 jobs:
   build-and-deploy:
-    runs-on: [self-hosted]   # Runner detail, same as original workflow
+    runs-on: [self-hosted]  # aapka runner
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
         with:
-          persist-credentials: false   # So that PAT can be used
+          persist-credentials: false
 
-      - name: Generate Version
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Generate Semantic Version
         id: set_version
         run: |
-          $buildNumber = (Get-Date -UFormat %H%M)
-          $VERSION = "v$(Get-Date -Format 'yyyy.MM.dd').$buildNumber"
-          echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
-          Write-Host "Generated version: $VERSION"
+          $major = 1
+          $minor = 0
+          $patch = (Get-Date -UFormat %H%M)
+          $version = "$major.$minor.$patch"
+          echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
+          Write-Host "Generated version: $version"
         shell: powershell
 
-      - name: Build Step
-        run: echo "Building ${{ env.PROJECT_NAME }} - Version ${{ env.VERSION }}"
+      - name: Update AssemblyInfo
+        run: |
+          (Get-Content Properties/AssemblyInfo.cs) `
+            -replace 'AssemblyVersion\(".*"\)', "AssemblyVersion(`"$env:VERSION`")" `
+            -replace 'AssemblyFileVersion\(".*"\)', "AssemblyFileVersion(`"$env:VERSION`")" `
+            | Set-Content Properties/AssemblyInfo.cs
+        shell: powershell
 
-      - name: Deploy Step
+      - name: Build DLL
+        run: dotnet build VersionedDemoApp.csproj -c Release
+
+      - name: Create Deploy Folder
         run: |
           mkdir -p ${{ env.DEPLOY_DIR }}
-          cp index.html ${{ env.DEPLOY_DIR }}/
-          # Create version file
+          cp bin/Release/net6.0/*.dll ${{ env.DEPLOY_DIR }}/
           echo ${{ env.VERSION }} > ${{ env.DEPLOY_DIR }}/version.txt
-          echo "Deploying ${{ env.PROJECT_NAME }} version ${{ env.VERSION }} to ${{ env.DEPLOY_DIR }}"
         shell: powershell
 
       - name: Create Git Tag
@@ -47,7 +60,7 @@ jobs:
           git config user.email "github-actions@github.com"
           git tag ${{ env.VERSION }}
           $token = "${{ secrets.PAT_TOKEN }}".Trim()
-          git remote set-url origin "https://x-access-token:$token@github.com/Khuramabbasi07/Portfolio-website.git"
+          git remote set-url origin "https://x-access-token:$token@github.com/Khuramabbasi07/VersionedDemoApp.git"
           git push origin ${{ env.VERSION }}
         shell: powershell
 
@@ -57,3 +70,4 @@ jobs:
           tag_name: ${{ env.VERSION }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
