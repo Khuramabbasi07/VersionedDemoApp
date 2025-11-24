@@ -12,7 +12,7 @@ env:
 
 jobs:
   build-and-deploy:
-    runs-on: self-hosted  
+    runs-on: [self-hosted, LAPTOP-17] 
 
     steps:
       - name: Checkout Code
