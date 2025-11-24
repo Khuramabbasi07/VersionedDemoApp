@@ -1,60 +1,27 @@
-# .github/workflows/ci-cd.yml
-name: Run on LAPTOP-17
+name: Versioned Build & Release
 
 on:
   push:
     branches:
-      - main 
-
-env:
-  PROJECT_NAME: Versioned Build & Release
-  DEPLOY_DIR: "./deploy"
+      - main
 
 jobs:
   build-and-deploy:
-    runs-on: self-hosted
+    runs-on: [self-hosted, LAPTOP-17]
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
         with:
-          persist-credentials: false   # taake hum PAT use kar saken
+          dotnet-version: '6.0.x'
 
-      - name: Generate Version
-        id: set_version
+      - name: Build Project
+        run: dotnet build VersionedDemoApp.csproj -c Release
+
+      - name: Deploy
         run: |
-          $buildNumber = (Get-Date -UFormat %H%M)
-          $VERSION = "v$(Get-Date -Format 'yyyy.MM.dd').$buildNumber"
-          echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
-          Write-Host "Generated version: $VERSION"
-        shell: powershell
-
-      - name: Build Step
-        run: echo "Building ${{ env.PROJECT_NAME }} - Version ${{ env.VERSION }}"
-
-      - name: Deploy Step
-        run: |
-          mkdir -p ${{ env.DEPLOY_DIR }}
-          cp index.html ${{ env.DEPLOY_DIR }}/
-          # Create version file
-          echo ${{ env.VERSION }} > ${{ env.DEPLOY_DIR }}/version.txt
-          echo "Deploying ${{ env.PROJECT_NAME }} version ${{ env.VERSION }} to ${{ env.DEPLOY_DIR }}"
-        shell: powershell
-
-      - name: Create Git Tag
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git tag ${{ env.VERSION }}
-          # Trim token to remove any newline/space issues
-          $token = "${{ secrets.PAT_TOKEN }}".Trim()
-          git remote set-url origin "https://x-access-token:$token@github.com/Khuramabbasi07/Portfolio-website.git"
-          git push origin ${{ env.VERSION }}
-        shell: powershell
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ env.VERSION }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          mkdir -p ./deploy
+          cp bin/Release/net6.0/*.dll ./deploy/
