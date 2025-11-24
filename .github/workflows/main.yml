@@ -1,9 +1,10 @@
+# .github/workflows/versioned-ci-cd.yml
 name: Versioned Build & Release
 
 on:
   push:
     branches:
-      - main   
+      - main   # Ya QA/UAT branch bhi add kar sakte ho
 
 env:
   PROJECT_NAME: "VersionedDemoApp"
@@ -14,16 +15,19 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      # 1️⃣ Checkout Code
       - name: Checkout Code
         uses: actions/checkout@v3
         with:
-          persist-credentials: false
+          persist-credentials: false   # taake hum PAT use kar saken
 
+      # 2️⃣ Setup .NET SDK
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '6.0.x'
 
+      # 3️⃣ Generate Semantic Version
       - name: Generate Semantic Version
         id: set_version
         run: |
@@ -36,6 +40,7 @@ jobs:
           Write-Host "Generated version: $version"
         shell: powershell
 
+      # 4️⃣ Update AssemblyInfo.cs with the generated version
       - name: Update AssemblyInfo
         run: |
           (Get-Content Properties/AssemblyInfo.cs) `
@@ -44,9 +49,11 @@ jobs:
             | Set-Content Properties/AssemblyInfo.cs
         shell: powershell
 
+      # 5️⃣ Build DLL
       - name: Build DLL
         run: dotnet build VersionedDemoApp.csproj -c Release
 
+      # 6️⃣ Create Deploy Folder & copy DLL + version.txt
       - name: Create Deploy Folder
         run: |
           mkdir -p ${{ env.DEPLOY_DIR }}
@@ -54,6 +61,7 @@ jobs:
           echo ${{ env.VERSION }} > ${{ env.DEPLOY_DIR }}/version.txt
         shell: powershell
 
+      # 7️⃣ Create Git Tag
       - name: Create Git Tag
         run: |
           git config user.name "github-actions"
@@ -64,6 +72,7 @@ jobs:
           git push origin ${{ env.VERSION }}
         shell: powershell
 
+      # 8️⃣ Create GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
