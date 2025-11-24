@@ -1,27 +1,80 @@
+# .github/workflows/versioned-build-release.yml
 name: Versioned Build & Release
 
 on:
   push:
     branches:
-      - main
+      - main   # Aap QA/UAT/Prod branch bhi add kar sakte ho
+
+env:
+  PROJECT_NAME: "VersionedDemoApp"
+  DEPLOY_DIR: "./deploy"
 
 jobs:
-  build-and-deploy:
-    runs-on: [self-hosted, LAPTOP-17]
+  build-and-release:
+    runs-on: [self-hosted, LAPTOP-17]  # Runner label
 
     steps:
+      # 1️⃣ Checkout repo
       - name: Checkout Code
         uses: actions/checkout@v3
+        with:
+          persist-credentials: false
 
+      # 2️⃣ Setup .NET
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '6.0.x'
 
-      - name: Build Project
+      # 3️⃣ Generate Semantic Version
+      - name: Generate Semantic Version
+        id: set_version
+        run: |
+          $major = 1
+          $minor = 0
+          $patch = (Get-Date -UFormat %H%M)
+          $version = "$major.$minor.$patch"
+          echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
+          Write-Host "Generated version: $version"
+        shell: powershell
+
+      # 4️⃣ Update AssemblyInfo.cs
+      - name: Update AssemblyInfo
+        run: |
+          (Get-Content Properties/AssemblyInfo.cs) `
+            -replace 'AssemblyVersion\(".*"\)', "AssemblyVersion(`"$env:VERSION`")" `
+            -replace 'AssemblyFileVersion\(".*"\)', "AssemblyFileVersion(`"$env:VERSION`")" `
+            | Set-Content Properties/AssemblyInfo.cs
+        shell: powershell
+
+      # 5️⃣ Build DLL
+      - name: Build DLL
         run: dotnet build VersionedDemoApp.csproj -c Release
 
-      - name: Deploy
+      # 6️⃣ Create Deploy Folder + Copy DLL + Version File
+      - name: Create Deploy Folder
         run: |
-          mkdir -p ./deploy
-          cp bin/Release/net6.0/*.dll ./deploy/
+          if (-Not (Test-Path ${{ env.DEPLOY_DIR }})) { New-Item -ItemType Directory -Path ${{ env.DEPLOY_DIR }} }
+          Copy-Item -Path bin/Release/net6.0/*.dll -Destination ${{ env.DEPLOY_DIR }} -Force
+          echo ${{ env.VERSION }} > ${{ env.DEPLOY_DIR }}/version.txt
+        shell: powershell
+
+      # 7️⃣ Create Git Tag
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ env.VERSION }}
+          $token = "${{ secrets.PAT_TOKEN }}".Trim()
+          git remote set-url origin "https://x-access-token:$token@github.com/Khuramabbasi07/VersionedDemoApp.git"
+          git push origin ${{ env.VERSION }}
+        shell: powershell
+
+      # 8️⃣ Create GitHub Release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
