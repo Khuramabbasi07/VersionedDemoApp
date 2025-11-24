@@ -1,5 +1,5 @@
 # .github/workflows/ci-cd.yml
-name: Versioned Build & Deploy
+name: Versioned Build & Release
 
 on:
   push:
@@ -12,13 +12,13 @@ env:
 
 jobs:
   build-and-deploy:
-    runs-on: [self-hosted]  # aapka runner
+    runs-on: self-hosted   # aapka runner
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
         with:
-          persist-credentials: false
+          persist-credentials: false   # PAT use karne ke liye
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
@@ -28,6 +28,7 @@ jobs:
       - name: Generate Semantic Version
         id: set_version
         run: |
+          # Semantic version: major.minor.patch
           $major = 1
           $minor = 0
           $patch = (Get-Date -UFormat %H%M)
@@ -47,11 +48,12 @@ jobs:
       - name: Build DLL
         run: dotnet build VersionedDemoApp.csproj -c Release
 
-      - name: Create Deploy Folder
+      - name: Deploy Step
         run: |
           mkdir -p ${{ env.DEPLOY_DIR }}
           cp bin/Release/net6.0/*.dll ${{ env.DEPLOY_DIR }}/
           echo ${{ env.VERSION }} > ${{ env.DEPLOY_DIR }}/version.txt
+          echo "Deploying ${{ env.PROJECT_NAME }} version ${{ env.VERSION }} to ${{ env.DEPLOY_DIR }}"
         shell: powershell
 
       - name: Create Git Tag
@@ -69,5 +71,3 @@ jobs:
         with:
           tag_name: ${{ env.VERSION }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
