@@ -4,7 +4,7 @@ name: Versioned Build & Release
 on:
   push:
     branches:
-      - main   # ya QA/UAT branch
+      - main 
 
 env:
   PROJECT_NAME: "VersionedDemoApp"
@@ -12,7 +12,7 @@ env:
 
 jobs:
   build-and-deploy:
-    runs-on: self-hosted   # aapka runner
+    runs-on: self-hosted  
 
     steps:
       - name: Checkout Code
@@ -71,3 +71,4 @@ jobs:
         with:
           tag_name: ${{ env.VERSION }}
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
