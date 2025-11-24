@@ -4,7 +4,7 @@ name: Run on LAPTOP-17
 on:
   push:
     branches:
-      - main  # Workflow will run only on main branch
+      - main   
 
 env:
   PROJECT_NAME: "Simple-CI-CD-Demo"
@@ -12,7 +12,7 @@ env:
 
 jobs:
   build-and-deploy:
-    runs-on: self-hosted  # Make sure your runner has 'self-hosted' label
+    runs-on: [self-hosted]   # Runner detail, same as original workflow
 
     steps:
       - name: Checkout Code
@@ -23,11 +23,8 @@ jobs:
       - name: Generate Version
         id: set_version
         run: |
-          # Semantic-style versioning example: major.minor.patch
-          $major = 1
-          $minor = 0
-          $patch = (Get-Date -UFormat %H%M)
-          $VERSION = "$major.$minor.$patch"
+          $buildNumber = (Get-Date -UFormat %H%M)
+          $VERSION = "v$(Get-Date -Format 'yyyy.MM.dd').$buildNumber"
           echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
           Write-Host "Generated version: $VERSION"
         shell: powershell
@@ -38,4 +35,25 @@ jobs:
       - name: Deploy Step
         run: |
           mkdir -p ${{ env.DEPLOY_DIR }}
-          cp index.html ${{ env.DE
+          cp index.html ${{ env.DEPLOY_DIR }}/
+          # Create version file
+          echo ${{ env.VERSION }} > ${{ env.DEPLOY_DIR }}/version.txt
+          echo "Deploying ${{ env.PROJECT_NAME }} version ${{ env.VERSION }} to ${{ env.DEPLOY_DIR }}"
+        shell: powershell
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ env.VERSION }}
+          $token = "${{ secrets.PAT_TOKEN }}".Trim()
+          git remote set-url origin "https://x-access-token:$token@github.com/Khuramabbasi07/Portfolio-website.git"
+          git push origin ${{ env.VERSION }}
+        shell: powershell
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
